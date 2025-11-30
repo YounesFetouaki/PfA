@@ -1,150 +1,137 @@
 const cvAnalyzerService = require('../../services/new-features/cvAnalyzer.service');
+const datasetAnalyzerService = require('../../services/new-features/datasetAnalyzer.service');
 const supabaseService = require('../../services/new-features/supabase.service');
 const multer = require('multer');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 /**
- * Analyse un CV uploadé
+ * Analyse un CV uploadé et le compare avec le dataset
  */
 const analyzeCV = async (req, res) => {
-  console.log('[STEP 1] analyzeCV called');
   try {
-    console.log('[STEP 2] Checking authentication');
-    // Validate authentication
+    console.log('[STEP 1] analyzeCV called');
+    
     if (!req.user?.id) {
-      console.log('[ERROR] No user ID');
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    console.log('[STEP 3] Extracting request body');
-    // With multer, text fields from FormData are in req.body
-    const jobId = req.body.jobId;
-    let jobDescription = req.body.jobDescription;
+    const { jobId, jobDescription } = req.body;
     const pdfBuffer = req.file?.buffer;
 
-    console.log('=== CV Upload Request ===');
-    console.log('User ID:', req.user.id);
-    console.log('File received:', !!pdfBuffer);
-    console.log('File size:', req.file?.size, 'bytes');
-    console.log('File type:', req.file?.mimetype);
-    console.log('Request body keys:', Object.keys(req.body));
-    console.log('jobId from body:', jobId);
-    console.log('jobDescription from body:', jobDescription);
-    console.log('jobDescription type:', typeof jobDescription);
-    console.log('jobDescription length:', jobDescription?.length);
-
-    console.log('[STEP 4] Validating file');
-    // Validate file
+    console.log('[STEP 2] Validating file');
     if (!pdfBuffer) {
-      console.log('[ERROR] No PDF buffer');
-      return res.status(400).json({ error: 'Fichier PDF requis' });
+      return res.status(400).json({ error: 'PDF file required' });
     }
 
-    console.log('[STEP 5] Validating file type');
-    // Validate file type
     if (req.file?.mimetype !== 'application/pdf') {
-      console.log('[ERROR] Wrong file type:', req.file?.mimetype);
       return res.status(400).json({ error: 'Only PDF files are supported' });
     }
 
-    console.log('[STEP 6] Validating file size');
-    // Validate file size (10MB limit to match multer config)
-    const MAX_FILE_SIZE = 10 * 1024 * 1024;
-    if (req.file.size > MAX_FILE_SIZE) {
-      console.log('[ERROR] File too large');
-      return res.status(413).json({ error: 'File size exceeds 10MB limit' });
+    if (!jobDescription || jobDescription.trim().length === 0) {
+      return res.status(400).json({ error: 'Job description is required' });
     }
 
-    console.log('[STEP 7] Validating job description');
-    // Validate job description - make it optional but provide default
-    if (!jobDescription || (typeof jobDescription === 'string' && jobDescription.trim().length === 0)) {
-      console.log('[WARNING] No job description provided, using default');
-      jobDescription = 'Analyse générale du CV sans fiche de poste spécifique. Extrayez les compétences, expériences, formations et langues du candidat.';
-    }
+    console.log('[STEP 3] Analyzing CV with dataset-based extraction');
     
-    // Ensure it's a string
-    if (typeof jobDescription !== 'string') {
-      jobDescription = String(jobDescription);
-    }
-
-    if (jobDescription.length > 5000) {
-      console.log('[ERROR] Job description too long');
-      return res.status(400).json({ error: 'Job description exceeds 5000 characters' });
-    }
-
-    console.log('[STEP 8] Starting CV analysis service');
-    console.log('Calling cvAnalyzerService.processCV...');
-    console.log('Using job description (first 100 chars):', jobDescription.substring(0, 100) + '...');
-
-    // Analyze the CV
+    // Step 1: Analyze CV using dataset-based extraction
     const analysisResult = await cvAnalyzerService.processCV(pdfBuffer, jobDescription);
 
-    console.log('[STEP 9] CV analysis completed, saving to database...');
+    console.log('[STEP 4] Comparing with dataset');
+    
+    // Step 2: Compare with dataset (with error handling)
+    let datasetComparison = null;
+    let datasetInsights = null;
+    
+    try {
+      datasetComparison = datasetAnalyzerService.compareWithDataset({
+        ...analysisResult.extractedData,
+        matchScore: analysisResult.matchAnalysis.score / 100
+      });
+      console.log('[STEP 5] Getting dataset insights');
+      datasetInsights = datasetAnalyzerService.getDatasetInsights();
+    } catch (datasetError) {
+      console.warn('[WARNING] Dataset comparison failed:', datasetError.message);
+      // Continue without dataset comparison - CV analysis is still valid
+    }
 
-    // Save to Supabase
-    const cvAnalysis = await supabaseService.createCVAnalysis({
+    console.log('[STEP 6] Saving to database');
+    
+    // Step 4: Save to Supabase
+    const cvAnalysisData = {
       candidate_id: req.user.id,
       job_id: jobId || null,
       extracted_data: analysisResult.extractedData,
       match_analysis: analysisResult.matchAnalysis,
       analyzed_at: analysisResult.analyzedAt,
       status: 'analyzed'
-    });
+    };
+    
+    // Add dataset fields only if they exist (to handle cases where columns might not be added yet)
+    if (datasetComparison !== null) {
+      cvAnalysisData.dataset_comparison = datasetComparison;
+    }
+    if (datasetInsights !== null) {
+      cvAnalysisData.dataset_insights = datasetInsights;
+    }
+    
+    const cvAnalysis = await supabaseService.createCVAnalysis(cvAnalysisData);
 
-    console.log('Analysis saved successfully');
+    console.log('[STEP 7] Success - returning results');
 
     res.status(200).json({
       success: true,
       data: cvAnalysis,
-      analysis: analysisResult
+      analysis: {
+        extractedData: analysisResult.extractedData,
+        matchAnalysis: analysisResult.matchAnalysis,
+        datasetComparison: datasetComparison,
+        datasetInsights: datasetInsights
+      }
     });
   } catch (error) {
-    console.error('=== Erreur analyse CV ===');
-    console.error('Message:', error.message);
-    console.error('Stack:', error.stack);
-    
+    console.error('CV Analysis Error:', error);
     res.status(500).json({
-      error: error.message || 'Failed to analyze CV. Please try again.'
+      error: error.message || 'Failed to analyze CV'
     });
   }
 };
 
 /**
- * Récupère toutes les analyses de CV pour un poste
+ * Récupère toutes les analyses de CV (tous les candidats)
  */
-const getCVAnalysesByJob = async (req, res) => {
+const getAllCandidates = async (req, res) => {
   try {
-    const { jobId } = req.params;
+    const { jobId, status, minScore, maxScore, limit, sortBy, sortOrder } = req.query;
 
-    if (!jobId) {
-      return res.status(400).json({ error: 'jobId is required' });
-    }
+    const filters = {};
+    if (jobId) filters.jobId = jobId;
+    if (status) filters.status = status;
+    if (minScore) filters.minScore = minScore;
+    if (maxScore) filters.maxScore = maxScore;
+    if (limit) filters.limit = limit;
+    if (sortBy) filters.sortBy = sortBy;
+    if (sortOrder) filters.sortOrder = sortOrder;
 
-    const analyses = await supabaseService.getCVAnalysesByJob(jobId);
+    const candidates = await supabaseService.getAllCandidates(filters);
 
     res.status(200).json({
       success: true,
-      data: analyses
+      data: candidates,
+      count: candidates.length
     });
   } catch (error) {
-    console.error('Erreur récupération analyses:', error);
-    res.status(500).json({
-      error: error.message || 'Failed to retrieve analyses. Please try again.'
-    });
+    console.error('Erreur récupération candidats:', error);
+    res.status(500).json({ error: error.message });
   }
 };
 
 /**
- * Récupère une analyse spécifique
+ * Récupère une analyse de CV spécifique avec tous les détails
  */
-const getCVAnalysis = async (req, res) => {
+const getCVAnalysisById = async (req, res) => {
   try {
     const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({ error: 'Analysis ID is required' });
-    }
 
     const analysis = await supabaseService.getCVAnalysis(id);
 
@@ -158,84 +145,13 @@ const getCVAnalysis = async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur récupération analyse:', error);
-    res.status(500).json({
-      error: error.message || 'Failed to retrieve analysis. Please try again.'
-    });
-  }
-};
-
-/**
- * Met à jour le statut d'une analyse
- */
-const updateCVAnalysisStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!id) {
-      return res.status(400).json({ error: 'Analysis ID is required' });
-    }
-
-    if (!status) {
-      return res.status(400).json({ error: 'Status is required' });
-    }
-
-    const updates = { status };
-
-    if (status === 'reviewed') {
-      updates.reviewed_by = req.user?.id;
-      updates.reviewed_at = new Date().toISOString();
-    }
-
-    const analysis = await supabaseService.updateCVAnalysis(id, updates);
-
-    if (!analysis) {
-      return res.status(404).json({ error: 'Analyse non trouvée' });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: analysis
-    });
-  } catch (error) {
-    console.error('Erreur mise à jour analyse:', error);
-    res.status(500).json({
-      error: error.message || 'Failed to update analysis. Please try again.'
-    });
-  }
-};
-
-/**
- * Récupère les candidats les mieux notés pour un poste
- */
-const getTopCandidates = async (req, res) => {
-  try {
-    const { jobId } = req.params;
-    const limit = Math.min(parseInt(req.query.limit) || 10, 100); // Max 100
-
-    if (!jobId) {
-      return res.status(400).json({ error: 'jobId is required' });
-    }
-
-    const topCandidates = await supabaseService.getTopCandidates(jobId, limit);
-
-    res.status(200).json({
-      success: true,
-      data: topCandidates
-    });
-  } catch (error) {
-    console.error('Erreur récupération top candidats:', error);
-    res.status(500).json({
-      error: error.message || 'Failed to retrieve top candidates. Please try again.'
-    });
+    res.status(500).json({ error: error.message });
   }
 };
 
 module.exports = {
   analyzeCV,
-  getCVAnalysesByJob,
-  getCVAnalysis,
-  updateCVAnalysisStatus,
-  getTopCandidates,
+  getAllCandidates,
+  getCVAnalysisById,
   upload
 };

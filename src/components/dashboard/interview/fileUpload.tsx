@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { Inbox } from "lucide-react";
 import { useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { parsePdf } from "@/actions/parse-pdf";
 
 type Props = {
   isUploaded: boolean;
@@ -44,19 +43,69 @@ function FileUpload({
         const formData = new FormData();
         formData.append("file", file);
 
-        const result = await parsePdf(formData);
+        // Use API route instead of server action for better compatibility
+        const response = await fetch("/api/parse-pdf", {
+          method: "POST",
+          body: formData,
+        });
+
+        // Check if response is OK and is JSON
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = `HTTP error! status: ${response.status}`;
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.error || errorMessage;
+          } catch {
+            // If not JSON, use the text as error
+            errorMessage = errorText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+
+        // Check content type to ensure it's JSON
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text();
+          throw new Error(`Unexpected response format. Expected JSON but got: ${contentType}`);
+        }
+
+        const result = await response.json();
         if (!result.success) {
-          throw new Error(result.error);
+          const errorMsg = result.error || "Failed to parse PDF";
+          console.error("PDF parsing failed:", errorMsg);
+          toast.error("Error reading PDF", {
+            description: errorMsg,
+            duration: 5000,
+          });
+          setFileName("");
+          setIsUploaded(false);
+          return;
         }
         const fullText = result.text || "";
+        if (!fullText || fullText.trim().length === 0) {
+          toast.error("PDF is empty", {
+            description: "The PDF file does not contain any readable text.",
+            duration: 5000,
+          });
+          setFileName("");
+          setIsUploaded(false);
+          return;
+        }
         setUploadedDocumentContext(fullText);
         setIsUploaded(true);
-      } catch (error) {
-        console.log(error);
-        toast.error("Error reading PDF", {
-          description: "Please try again.",
+        toast.success("PDF uploaded successfully", {
+          description: `Extracted ${fullText.length} characters from PDF`,
           duration: 3000,
         });
+      } catch (error: any) {
+        console.error("Error uploading PDF:", error);
+        toast.error("Error reading PDF", {
+          description: error.message || "Please try again.",
+          duration: 5000,
+        });
+        setFileName("");
+        setIsUploaded(false);
       } finally {
         setUploading(false);
       }

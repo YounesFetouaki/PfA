@@ -33,13 +33,39 @@ class SupabaseService {
   async createCVAnalysis(data) {
     if (!this.client) throw new Error('Supabase non configuré');
     
+    // Remove dataset_comparison and dataset_insights if columns don't exist
+    // This prevents errors if migration hasn't been run yet
+    const insertData = { ...data };
+    
+    // Check if columns exist by trying to insert without them first if error occurs
     const { data: result, error } = await this.client
       .from('cv_analysis')
-      .insert(data)
+      .insert(insertData)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // If error is about missing columns, try without them
+      if (error.message && error.message.includes('dataset_comparison') || error.message.includes('dataset_insights')) {
+        console.warn('⚠️  dataset_comparison or dataset_insights columns not found. Please run the migration SQL.');
+        console.warn('⚠️  Run: supabase_add_dataset_columns.sql in your Supabase SQL Editor');
+        
+        // Remove dataset fields and try again
+        delete insertData.dataset_comparison;
+        delete insertData.dataset_insights;
+        
+        const { data: retryResult, error: retryError } = await this.client
+          .from('cv_analysis')
+          .insert(insertData)
+          .select()
+          .single();
+        
+        if (retryError) throw retryError;
+        return retryResult;
+      }
+      throw error;
+    }
+    
     return result;
   }
 
@@ -95,6 +121,60 @@ class SupabaseService {
 
     if (error) throw error;
     return data;
+  }
+
+  async getAllCandidates(filters = {}) {
+    if (!this.client) throw new Error('Supabase non configuré');
+    
+    let query = this.client
+      .from('cv_analysis')
+      .select('*');
+
+    // Apply filters
+    if (filters.jobId) {
+      query = query.eq('job_id', filters.jobId);
+    }
+
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    if (filters.minScore || filters.maxScore) {
+      // Note: Supabase JSONB filtering is limited, we'll filter in JS
+    }
+
+    // Order by created_at descending by default
+    query = query.order('created_at', { ascending: false });
+
+    if (filters.limit) {
+      query = query.limit(parseInt(filters.limit));
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Apply score filtering in JavaScript if needed
+    let filteredData = data;
+    if (filters.minScore || filters.maxScore) {
+      filteredData = data.filter(candidate => {
+        const score = candidate.match_analysis?.score || 0;
+        if (filters.minScore && score < parseInt(filters.minScore)) return false;
+        if (filters.maxScore && score > parseInt(filters.maxScore)) return false;
+        return true;
+      });
+    }
+
+    // Sort by score if requested
+    if (filters.sortBy === 'score') {
+      filteredData.sort((a, b) => {
+        const scoreA = a.match_analysis?.score || 0;
+        const scoreB = b.match_analysis?.score || 0;
+        return filters.sortOrder === 'asc' ? scoreA - scoreB : scoreB - scoreA;
+      });
+    }
+
+    return filteredData;
   }
 
   /**

@@ -76,6 +76,18 @@ function SideMenu() {
           
           <div
             className={`flex flex-row p-3 rounded-md hover:bg-slate-200 cursor-pointer ${
+              pathname.includes("/candidates")
+                ? "bg-indigo-200"
+                : "bg-slate-100"
+            }`}
+            onClick={() => router.push("/dashboard/candidates")}
+          >
+            <FileTextIcon className="font-thin mr-2" />
+            <p className="font-medium ">Candidats</p>
+          </div>
+          
+          <div
+            className={`flex flex-row p-3 rounded-md hover:bg-slate-200 cursor-pointer ${
               pathname.includes("/voice-interview")
                 ? "bg-indigo-200"
                 : "bg-slate-100"

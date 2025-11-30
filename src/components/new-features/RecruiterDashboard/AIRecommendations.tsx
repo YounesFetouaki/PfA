@@ -185,29 +185,7 @@ export const AIRecommendations: __React__.__FC__<__AIRecommendationsProps__> = (
         )}
       </div>
 
-      {/* NEW: CV Analysis Results */}
-      {cvAnalyses.length > 0 && (
-        <Card className="border-2 border-blue-200">
-          <CardHeader>
-            <CardTitle>📋 Résultats détaillés des analyses CV</CardTitle>
-            <CardDescription>
-              {cvAnalyses.length} CVs analysés pour ce poste
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-8">
-              {cvAnalyses.map((analysis, index) => (
-                <div key={analysis.id} className="border-t pt-6 first:border-t-0 first:pt-0">
-                  <h3 className="text-lg font-semibold mb-4">
-                    Candidat #{index + 1}
-                  </h3>
-                  <CVAnalysisResults analysis={analysis} />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+    
     </div>
   );
 };

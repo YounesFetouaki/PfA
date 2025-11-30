@@ -73,42 +73,73 @@ function DetailsPopup({
   const onGenrateQuestions = async () => {
     setLoading(true);
 
-    const data = {
-      name: name.trim(),
-      objective: objective.trim(),
-      number: numQuestions,
-      context: uploadedDocumentContext,
-    };
+    try {
+      const data = {
+        name: name.trim(),
+        objective: objective.trim(),
+        number: numQuestions,
+        context: uploadedDocumentContext || "", // Ensure context is always a string
+      };
 
-    const generatedQuestions = (await axios.post(
-      "/api/generate-interview-questions",
-      data,
-    )) as any;
+      // Validate data before sending
+      if (!data.name || !data.objective || !data.number) {
+        alert("Please fill in all required fields: Name, Objective, and Number of Questions");
+        setLoading(false);
+        setIsClicked(false);
+        return;
+      }
 
-    const generatedQuestionsResponse = JSON.parse(
-      generatedQuestions?.data?.response,
-    );
+      const generatedQuestions = (await axios.post(
+        "/api/generate-interview-questions",
+        data,
+      )) as any;
 
-    const updatedQuestions = generatedQuestionsResponse.questions.map(
-      (question: Question) => ({
-        id: uuidv4(),
-        question: question.question.trim(),
-        follow_up_count: 1,
-      }),
-    );
+      // Check for errors in response
+      if (generatedQuestions?.data?.error) {
+        throw new Error(generatedQuestions.data.error);
+      }
 
-    const updatedInterviewData = {
-      ...interviewData,
-      name: name.trim(),
-      objective: objective.trim(),
-      questions: updatedQuestions,
-      interviewer_id: selectedInterviewer,
-      question_count: Number(numQuestions),
-      time_duration: duration,
-      description: generatedQuestionsResponse.description,
-      is_anonymous: isAnonymous,
-    };
-    setInterviewData(updatedInterviewData);
+      if (!generatedQuestions?.data?.response) {
+        throw new Error("No response from server");
+      }
+
+      const generatedQuestionsResponse = JSON.parse(
+        generatedQuestions?.data?.response,
+      );
+
+      // Validate response structure
+      if (!generatedQuestionsResponse.questions || !Array.isArray(generatedQuestionsResponse.questions)) {
+        throw new Error("Invalid response format: questions array not found");
+      }
+
+      const updatedQuestions = generatedQuestionsResponse.questions.map(
+        (question: Question) => ({
+          id: uuidv4(),
+          question: question.question?.trim() || "",
+          follow_up_count: 1,
+        }),
+      );
+
+      const updatedInterviewData = {
+        ...interviewData,
+        name: name.trim(),
+        objective: objective.trim(),
+        questions: updatedQuestions,
+        interviewer_id: selectedInterviewer,
+        question_count: Number(numQuestions),
+        time_duration: duration,
+        description: generatedQuestionsResponse.description || "",
+        is_anonymous: isAnonymous,
+      };
+      setInterviewData(updatedInterviewData);
+      setLoading(false);
+      setIsClicked(false);
+    } catch (error: any) {
+      console.error("Error generating questions:", error);
+      alert(`Failed to generate questions: ${error.message || "Unknown error"}`);
+      setLoading(false);
+      setIsClicked(false);
+    }
   };
 
   const onManual = () => {

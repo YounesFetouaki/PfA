@@ -30,11 +30,13 @@ const cvRoutes = require('./routes/new-features/cv.routes');
 const interviewRoutes = require('./routes/new-features/interview.routes');
 const dashboardRoutes = require('./routes/new-features/dashboard.routes');
 const mlRoutes = require('./routes/new-features/ml.routes');
+const datasetRoutes = require('./routes/new-features/dataset.routes');
 
 app.use('/api/new-features/cv', cvRoutes);
 app.use('/api/new-features/interview', interviewRoutes);
 app.use('/api/new-features/dashboard', dashboardRoutes);
 app.use('/api/new-features/ml', mlRoutes);
+app.use('/api/new-features/dataset', datasetRoutes);
 
 // Route de santé
 app.get('/health', (req, res) => {

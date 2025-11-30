@@ -75,6 +75,11 @@ export const cvApi = {
     return fetchAPI(`/cv/${id}`);
   },
 
+  getAllCandidates: async (filters: any = {}) => {
+    const queryString = new URLSearchParams(filters).toString();
+    return fetchAPI(`/cv/all?${queryString}`);
+  },
+
   getCVAnalysesByJob: async (jobId: string) => {
     return fetchAPI(`/cv/job/${jobId}`);
   },

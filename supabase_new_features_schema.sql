@@ -18,6 +18,12 @@ CREATE TABLE IF NOT EXISTS cv_analysis (
     -- Analyse de correspondance
     match_analysis JSONB NOT NULL DEFAULT '{}',
     
+    -- Comparaison avec le dataset de CVs
+    dataset_comparison JSONB DEFAULT '{}',
+    
+    -- Insights du dataset (statistiques, tendances)
+    dataset_insights JSONB DEFAULT '{}',
+    
     -- URL du PDF uploadé (stocké dans Supabase Storage)
     pdf_url TEXT,
     
@@ -35,6 +41,8 @@ CREATE INDEX IF NOT EXISTS idx_cv_analysis_candidate_job ON cv_analysis(candidat
 CREATE INDEX IF NOT EXISTS idx_cv_analysis_job_id ON cv_analysis(job_id);
 CREATE INDEX IF NOT EXISTS idx_cv_analysis_status ON cv_analysis(status);
 CREATE INDEX IF NOT EXISTS idx_cv_analysis_match_score ON cv_analysis((match_analysis->>'score'));
+CREATE INDEX IF NOT EXISTS idx_cv_analysis_dataset_comparison ON cv_analysis USING GIN (dataset_comparison);
+CREATE INDEX IF NOT EXISTS idx_cv_analysis_dataset_insights ON cv_analysis USING GIN (dataset_insights);
 
 -- Table: interview_session
 -- Sessions d'entretien vocal/vidéo avec l'IA

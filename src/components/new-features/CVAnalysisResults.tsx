@@ -31,15 +31,18 @@ const getRecommendationColor = (recommendation: string) => {
 export const CVAnalysisResults: React.FC<CVAnalysisResultsProps> = ({ analysis }) => {
   if (!analysis) return null;
   
-  // Handle Supabase snake_case: match_analysis, extracted_data
+  // Handle Supabase snake_case: match_analysis, extracted_data, dataset_comparison
   const matchAnalysis = analysis.match_analysis || analysis.matchAnalysis || analysis.analysis?.matchAnalysis;
   const extractedData = analysis.extracted_data || analysis.extractedData || analysis.analysis?.extractedData;
+  const datasetComparison = analysis.dataset_comparison || analysis.datasetComparison || analysis.analysis?.datasetComparison;
 
   console.log('CVAnalysisResults debug:', {
     hasMatchAnalysis: !!matchAnalysis,
     hasExtractedData: !!extractedData,
+    hasDatasetComparison: !!datasetComparison,
     matchAnalysisKeys: matchAnalysis ? Object.keys(matchAnalysis) : [],
     extractedDataKeys: extractedData ? Object.keys(extractedData) : [],
+    datasetComparisonKeys: datasetComparison ? Object.keys(datasetComparison) : [],
   });
 
   if (!matchAnalysis || !extractedData) {
@@ -53,6 +56,68 @@ export const CVAnalysisResults: React.FC<CVAnalysisResultsProps> = ({ analysis }
 
   return (
     <div className="space-y-6 mt-8">
+      {/* Dataset Comparison Section */}
+      {datasetComparison && (
+        <Card className="border-2 border-purple-300">
+          <CardHeader>
+            <CardTitle>📊 Market Comparison (vs Resume Dataset)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {datasetComparison.market_size && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600 text-sm">Similar Candidates</p>
+                  <p className="text-2xl font-bold">
+                    {datasetComparison.market_size.similar_candidates || 0}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {datasetComparison.market_size.percentage_of_market || 0}% of market
+                  </p>
+                </div>
+                {datasetComparison.experience_analysis && (
+                  <div>
+                    <p className="text-gray-600 text-sm">Market Percentile</p>
+                    <p className="text-2xl font-bold">
+                      {datasetComparison.experience_analysis.market_percentile || 'N/A'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {datasetComparison.market_position && (
+              <div>
+                <p className="text-gray-600 text-sm mb-2">Competitiveness</p>
+                <p className="text-lg font-bold text-purple-600">
+                  {datasetComparison.market_position.competitiveness || 'N/A'}
+                </p>
+              </div>
+            )}
+
+            {datasetComparison.skill_analysis?.trending_skills && Array.isArray(datasetComparison.skill_analysis.trending_skills) && (
+              <div>
+                <p className="text-gray-600 text-sm mb-2">Trending Skills</p>
+                <div className="flex flex-wrap gap-2">
+                  {datasetComparison.skill_analysis.trending_skills.map((skill: string) => (
+                    <span key={skill} className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {datasetComparison.dataset_comparison?.overall_market_rating && (
+              <div>
+                <p className="text-gray-600 text-sm mb-2">Overall Rating</p>
+                <p className="text-lg font-bold">
+                  {datasetComparison.dataset_comparison.overall_market_rating}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
       {/* Overall Score & Recommendation */}
       <Card className="border-2">
         <CardContent className="pt-6">
