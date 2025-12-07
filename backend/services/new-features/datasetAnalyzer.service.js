@@ -29,6 +29,7 @@ class DatasetAnalyzerService {
       });
 
       console.log(`Loaded ${records.length} resumes from dataset`);
+      
       this.dataCache = records;
       return records;
     } catch (error) {
