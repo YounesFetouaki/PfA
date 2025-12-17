@@ -1,0 +1,56 @@
+erDiagram
+    organization ||--|{ user : "has members"
+    organization ||--|{ interview : "owns"
+    
+    user ||--|{ interview : "creates"
+    
+    interviewer ||--|{ interview : "conducts"
+    
+    interview ||--|{ response : "captures"
+    interview ||--|{ feedback : "receives"
+    
+    organization {
+        uuid id PK
+        string name
+        string image_url
+        enum plan
+    }
+
+    user {
+        uuid id PK
+        string email
+        uuid organization_id FK
+    }
+
+    interviewer {
+        serial id PK
+        string name
+        string description
+        string agent_id
+        jsonb traits
+    }
+
+    interview {
+        uuid id PK
+        string name
+        boolean is_active
+        jsonb questions
+        uuid organization_id FK
+        uuid user_id FK
+        int interviewer_id FK
+    }
+
+    response {
+        serial id PK
+        uuid interview_id FK
+        string call_id
+        jsonb details
+        jsonb analytics
+        boolean is_analysed
+    }
+    
+    feedback {
+        serial id PK
+        uuid interview_id FK
+        int satisfaction
+    }

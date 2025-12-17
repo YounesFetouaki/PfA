@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant U as User/Candidate
+    participant Next as Next.js (Server Action)
+    participant DB as Supabase
+    participant AI as OpenAI (GPT-4)
+    participant Retell as Retell AI
+
+    Note over U, Next: Post-Interview Analysis
+
+    U->>Next: Request Analytics (Call ID)
+    activate Next
+    
+    Next->>DB: Get Response & Transcript (by Call ID)
+    DB-->>Next: Returns Transcript
+    
+    Next->>DB: Get Interview Questions
+    DB-->>Next: Returns Questions
+    
+    Note over Next: Construct System Prompt
+    
+    Next->>AI: Send Transcript + Prompts
+    activate AI
+    AI-->>Next: Return JSON Analysis
+    deactivate AI
+    
+    Next->>DB: Update Response (Save Analytics)
+    
+    Next-->>U: Return Analytics Data
+    deactivate Next

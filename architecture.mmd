@@ -1,0 +1,41 @@
+graph TB
+    subgraph Client [Client Side]
+        Browser["Web Browser"]
+    end
+
+    subgraph MainApp [Main Application Next.js 14]
+        NextFE["Frontend UI"]
+        NextSA["Server Actions"]
+        NextAPI["API Routes"]
+    end
+
+    subgraph Microservice [Backend Microservice]
+        ExpressAPI["Express Server"]
+        PyShell["Python Shell"]
+    end
+
+    subgraph Infra [Infrastructure Data]
+        Supabase[("Supabase PostgreSQL")]
+        Clerk["Clerk Authentication"]
+    end
+
+    subgraph ExternalAI [AI Services]
+        OpenAI["OpenAI GPT-4o"]
+        Retell["Retell AI Voice"]
+    end
+
+    Browser -->|HTTPS| NextFE
+
+    NextFE -->|Server Actions| NextSA
+    NextFE -->|Fetch API| ExpressAPI
+    
+    NextSA -->|SQL| Supabase
+    NextSA -->|API Call| OpenAI
+    
+    ExpressAPI -->|Processing| PyShell
+    ExpressAPI -->|SQL| Supabase
+    
+    NextAPI -->|Event Data| Retell
+    
+    NextFE -->|Auth Tokens| Clerk
+    NextSA -.->|Validate| Clerk

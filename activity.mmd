@@ -1,0 +1,33 @@
+stateDiagram-v2
+    [*] --> StartInterview
+    
+    StartInterview --> AuthCheck : User Accesses Link
+    
+    state AuthCheck <<choice>>
+    AuthCheck --> CheckSystem : Valid
+    AuthCheck --> [*] : Invalid/Expired
+    
+    CheckSystem --> JoinSession : Mic/Cam Permissions
+    
+    state "Interview Session (Voice)" as Interview {
+        [*] --> AIWaiting
+        AIWaiting --> UserSpeaking : User Speaks
+        UserSpeaking --> Processing : Silence Detected
+        Processing --> AIResponding : AI Generation
+        AIResponding --> AIWaiting : Question Asked
+    }
+    
+    JoinSession --> Interview
+    
+    Interview --> EndSession : Time Limit / User Ends
+    
+    EndSession --> GeneratingAnalytics : Background Process
+    
+    state GeneratingAnalytics {
+        [*] --> FetchTranscript
+        FetchTranscript --> SendToGPT
+        SendToGPT --> SaveToDB
+    }
+    
+    GeneratingAnalytics --> ViewResults : Ready
+    ViewResults --> [*]

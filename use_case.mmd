@@ -1,0 +1,30 @@
+graph TB
+    Candidate((Candidate))
+    Recruiter((Recruiter))
+    AI((System AI))
+
+    subgraph Platform [AI Recruitment Platform]
+        direction TB
+        UC1(Take Voice Interview)
+        UC2(View Profile)
+        UC3(Create Scenarios)
+        UC5(Analytics Dashboard)
+        
+        UC6(Transcribe Audio)
+        UC7(Analyze Responses)
+        UC8(Generate Insights)
+    end
+
+    Candidate --> UC1
+    Candidate --> UC2
+    
+    Recruiter --> UC3
+    Recruiter --> UC5
+    
+    UC1 -.->|Voice| AI
+    UC7 -.->|LLM| AI
+    
+    UC1 --> UC6
+    UC6 --> UC7
+    UC7 --> UC8
+    UC8 --> UC5
